@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="new_qrA">
+    <link name="qrA_link">
+      <visual name="visual_qrA">
+        <cast_shadows>true</cast_shadows>
+        <geometry>
+          <mesh>
+            <uri>model://QrcodeA/meshes/QrA.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://QrcodeA/materials/scripts</uri>
+            <uri>model://QrcodeA/materials/textures</uri> 
+            <name>qrA/color</name>
+          </script>
+        </material>
+      </visual>
+      <collision name="collision_qrA">
+        <geometry>
+          <mesh>
+            <uri>model://QrcodeA/meshes/QrA.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

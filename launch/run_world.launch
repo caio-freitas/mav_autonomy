@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+    <rosparam command="load" file="$(find mav_autonomy)/config/mavros_params.yaml"/>
+	<!-- Include the MAVROS node with SITL and Gazebo -->
+	<include file="$(find px4)/launch/mavros_posix_sitl.launch">
+        <!-- <arg name="world" default="$(find mav_autonomy)/worlds/frontdoor.world"/> -->
+        <arg name="z" default="0.5"/>
+        <!-- <arg name="vehicle" default="iris_fpv_cam"/> -->
+        <arg name="sdf" value="$(find mavlink_sitl_gazebo)/models/iris_fpv_cam/iris_fpv_cam.sdf"/>
+    </include>
+</launch>

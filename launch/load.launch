@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+    <rosparam command="load" file="$(find mav_autonomy)/config/mavros_params.yaml"/>
+	<!-- Include the MAVROS node with SITL and Gazebo -->
+	<include file="$(find px4)/launch/mavros_posix_sitl.launch">
+        <arg name="world" default="$(find mav_autonomy)/worlds/frontdoor_attached.world"/>
+        <arg name="paused" default="false"/>
+        <arg name="x" default="6.5596"/>
+        <arg name="y" default="5.32729"/>
+        <arg name="z" default="0.48"/>
+        <!-- <arg name="vehicle" default="iris_fpv_cam"/> -->
+        <arg name="sdf" value="$(find mavlink_sitl_gazebo)/models/iris_fpv_cam_box/iris_fpv_cam_box.sdf"/>
+    </include>
+
+
+    <!-- The following lines run the tracklive simulation sith visp_auto_tracker -->
+    <!-- <node pkg="visp_auto_tracker" type="visp_auto_tracker" name="visp_auto_tracker" output="screen">
+        <param name="model_path" type="string" value="$(find visp_auto_tracker)/models" />
+        <param name="model_name" type="string" value="pattern" />
+        <param name="debug_display" type="bool" value="True" />
+
+        <remap from="/visp_auto_tracker/camera_info" to="/iris/usb_cam/camera_info"/>
+        <remap from="/visp_auto_tracker/image_raw" to="/iris/usb_cam/image_raw"/>
+        <<param name="camera_info_url" value="package://mav_autonomy/models/calibration.ini" type="string" />
+    </node> 
+    <node pkg="mav_autonomy" type="transform_broadcaster.py" name="transform_broadcaster" required="true" output="screen" />
+    
+    -->
+    <node pkg="mav_autonomy" type="sm2.py" name="sm2" output="screen" />
+	<!-- <node pkg="mav_autonomy" type="apriltag_detector.py" name="apriltag_detector" /> -->
+    <node pkg="image_view" type="image_view" name="apriltag_detector_debug" args="image:=/apritag_detector/debug/image_raw" />
+</launch>

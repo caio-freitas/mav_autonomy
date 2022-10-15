@@ -1,0 +1,14 @@
+material qrA/color
+{
+  receive_shadows off
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture QrA.png
+      }
+    }
+  }
+}
