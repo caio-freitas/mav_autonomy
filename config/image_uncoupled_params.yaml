@@ -1,0 +1,5 @@
+controller_type: 'image_uncoupled'
+setpoint_features_x: 400
+setpoint_features_y: 480
+setpoint_features_z: 0.02
+setpoint_features_yaw: 0

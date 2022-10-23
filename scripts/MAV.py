@@ -311,7 +311,7 @@ class MAV:
 
 
     def RTL(self):
-        velocity = 0.7
+        velocity = 0.5
         ds = velocity/60.0
         self.rate.sleep()
         height = self.drone_pose.pose.position.z

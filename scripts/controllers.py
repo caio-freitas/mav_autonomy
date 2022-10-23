@@ -2,16 +2,54 @@ import rospy
 import numpy as np
 from simple_pid import PID
 
+# TODO do superclass 
 
-class ImageBasedController():
-    def __init__(self, s_d0 = [400, 480, 0.2, 0]):
+
+class Controller():
+    def __init__(self, setpoint, Z):
+        self.setpoint = setpoint
+        self.Z = 0
+        self.vb = 0
+        self.input_limits = [1, 1, 0.3, 0.2]
+
+    def set_target(self, setpoint):
+        self.setpoint = setpoint
+
+    def update_measurements(self, m, Z=None):
+        self.m = [m.x, m.y, m.z, m.w]
+        self.Z = Z
+
+    def calc_input(self):
+        return self.vb
+
+    def update_height(self, Z):
+        self.Z = Z
+    
+    def saturate_output(self, v):
+        v[0] = min(v[0], self.input_limits[0])
+        v[0] = max(v[0], -self.input_limits[0])
+
+        v[1] = min(v[1], self.input_limits[1])
+        v[1] = max(v[1], -self.input_limits[1])
+        
+        v[2] = min(v[2], self.input_limits[2])
+        v[2] = max(v[2], -self.input_limits[2])
+
+        v[3] = min(v[3], self.input_limits[3])
+        v[3] = max(v[3], -self.input_limits[3])
+
+        return v
+
+class ImageBasedController(Controller):
+    def __init__(self, init_setpoint = [400, 480, 0.2, 0], Z=2):
+        super().__init__(init_setpoint, Z)
         """
         s: set of visual features
         s = (x, y, A)
-        e = s - s_d: current error
+        e = s - setpoint: current error
         m = (u, v): image measurements
         a = (u0, v0, px, py): camera intrinsic parameters
-        px, py atio between focal length and pixel size
+        px, py atio between focal lengtv[0] = min(v[0], self.input_limits[0])h and pixel size
         Vc = (vc, wc): spacial velocity of camera
         lambda: controller gain
         TODO adaptive gain as in https://visp-doc.inria.fr/doxygen/visp-daily/classvpAdaptiveGain.html
@@ -25,68 +63,51 @@ class ImageBasedController():
 
         vc = - lambda * Lx+ * e
         """
-        self.sx = self.sy = 1.042
-        self.f = 692.978391
+        self.f = 692.978391 
         self.lamb = 0.7
-        self.s_d = s_d0
-        self.x_PID = PID(0.002, 0, 0, setpoint=s_d0[0])
-        self.y_PID = PID(0.002, 0, 0, setpoint=s_d0[1])
-        self.z_PID = PID(0.4, 0.001, 0, setpoint=s_d0[2])
-        self.w_PID = PID(0.1, 0, 0, setpoint=s_d0[3])
-        self.x_PID.output_limits = (-1, 1)
-        self.y_PID.output_limits = (-1, 1)
-        self.z_PID.output_limits = (-0.5, 0.5)
-        self.w_PID.output_limits = (-0.3, 0.3)
+        self.setpoint = init_setpoint
+        self.b_V_c = np.array([[0, -1, 0, 0],
+                        [-1, 0, 0, 0],
+                        [0, 0, 1, 0],
+                        [0, 0, 0, -1]])
         
         # J = np.zeros(4, 4)
         self.e = np.zeros(3)
         self.m = np.zeros(3)
 
-    def set_target(self, s_d):
-        self.s_d = s_d
-        self.x_PID.setpoint = s_d[0]
-        self.y_PID.setpoint = s_d[1]
-        self.z_PID.setpoint = s_d[2]
-        self.w_PID.setpoint = s_d[3]
+    def set_target(self, setpoint):
+        self.setpoint = setpoint
     
     def update_measurements(self, m, Z=None):
         self.m = [m.x, m.y, m.z, m.w]
         self.Z = Z
-        # print("measurements: {}".format(self.m))
 
     def calc_input(self):
-        e = (np.array(self.s_d) - np.array(self.m)).T
+        e = (np.array(self.setpoint) - np.array(self.m)).T
         # Lx = np.array([[0.003/self.Z, 0, 0, 0],
         #                 [0, 0.003/self.Z, 0, 0],
         #                 [0, 0, 0.4, 0],
         #                 [0, 0, 0, 0.05]])
-        Lx = np.array([[self.sx*self.Z/self.f, 0, 0, 0],
-                        [0, self.sy*self.Z/self.f, 0, 0],
-                        [0, 0, 0.4, 0],
-                        [0, 0, 0, 0.05]])
-        ur = np.matmul(Lx, e)
-
-        #### use PIDs ################
-        # ur = np.array([[self.x_PID (self.m[0])],
-        #                 [self.y_PID(self.m[1])], 
-        #                 [self.z_PID(self.m[2])],
-        #                 [self.w_PID(self.m[3])]])
-        
-        b_V_c = np.array([[0, -1, 0, 0],
-                        [-1, 0, 0, 0],
+        Lx_i = np.array([[self.Z/self.f, 0, 0, 0],
+                        [0, self.Z/self.f, 0, 0],
                         [0, 0, 1, 0],
-                        [0, 0, 0, -1]])
-        vr = -self.lamb*np.matmul(b_V_c,ur)
-        # print(vr)
+                        [0, 0, 0, 0.05]])
+        
+        ur = np.matmul(Lx_i, e)
+        
+        vr = -self.lamb*np.matmul(self.b_V_c,ur)
+        vr = self.saturate_output(vr)
+
         return vr
 
 
-class IBVS():
-    def __init__(self, s_d0 = []):
+class IBVS(Controller):
+    def __init__(self, init_setpoint = [], Z=2):
+        super().__init__(init_setpoint, Z)
         """
         s: set of visual features
         s = (x_c, y_c, A)
-        e = s - s_d: current error
+        e = s - setpoint: current error
         m = (u, v): image measurements
         a = (u0, v0, px, py): camera intrinsic parameters
         px, py atio between focal length and pixel size
@@ -103,61 +124,50 @@ class IBVS():
 
         vc = - lambda * Lx+ * e
         """
-        self.s_d = s_d0
-        self.sx = self.sy = 1.042
+        self.setpoint = init_setpoint
         self.Z = 2
-        self.d_real = 0.2
-        self.f = 692.978391
-        x = y = 400
-        self.lamb = 1
+        self.f = 692.978391 #3.67e-3
+        x = y = 0
+        self.lamb = 10
 
-        Ls = np.array([[ -self.f/self.Z,  0, x*self.f/self.Z,     y],
-                        [0, -self.f/self.Z, y*self.f/self.Z, -x],
-                        [0, 0, 1/0.4, 0],
-                        [0, 0, 0, -1]])
-        self.c_V_n = np.array([[0, -1, 0, 0],
-                        [-1, 0, 0, 0],
-                        [0, 0, 1, 0],
-                        [0, 0, 0, -1]])
-        Js = np.linalg.inv(np.matmul(Ls, self.c_V_n))
+        Ls = self.calc_Ls(x, y, self.Z)
+        
+        self.c_V_n = np.array([[0, 1, 0, 0],
+                            [1, 0, 0, 0],
+                            [0, 0, 1, 0],
+                            [0, 0, 0, -1]])
+        
         # J = np.zeros(4, 4)
         self.e = np.zeros(4)
         self.m = np.zeros(4)
         self.vr = np.zeros(4)
 
-    def set_target(self, s_d):
-        self.s_d = s_d
-    
-    def update_height(self, z):
-        self.Z = z
-
-    def update_measurements(self, m, Z):
-        self.Z = Z
-        self.m = [m.x, m.y, m.z, m.w]
-        e = (np.array(self.s_d) - np.array(self.m)).T
-        
-        # Ls = np.array([[ -self.f/self.Z,  0, m.x*self.f/self.Z,     m.y],
-        #                 [0, -self.f/self.Z, m.y*self.f/self.Z, -m.x],
-        #                 [0, 0, 1/0.4, 0],
-        #                 [0, 0, 0, -1]])
-        Ls = np.array([[self.f/self.sx*self.Z, 0, 0, 0],
-                        [0, self.f/self.sy*self.Z, 0, 0],
-                        [0, 0, 1/0.4, 0],
-                        [0, 0, 0, 1/0.05]])
-        self.c_V_n = np.array([[0, -1, 0, 0],
-                        [-1, 0, 0, 0],
-                        [0, 0, 1, 0],
-                        [0, 0, 0, -1]])
-        
-        rospy.loginfo("Ls: {}".format(Ls))
-        Js = np.matmul(Ls, self.c_V_n)
-        rospy.loginfo("Js: {}".format(Ls))
-        Js_i = np.linalg.inv(Js)
-        rospy.loginfo("Js_inverse: {}".format(Js_i))
-        rospy.loginfo("e: {}".format(e))
-        self.vr = -self.lamb*np.matmul(Js,e)
-        rospy.loginfo(self.vr)
+    def calc_Ls(self, x, y, Z):
+        return np.array([[-1/Z,        0, x/Z, x*y   , -(1+x**2),  y],
+                        [0,         -1/Z, y/Z,  1+y**2, -x*y,     -x]])
     
     def calc_input(self):
-        
+        x = (self.m[0] - 400)/self.f
+        y = (self.m[1] - 400)/self.f
+        est_X = x*self.Z
+        est_Y = y*self.Z
+        rospy.loginfo("estimated relative position: {}, {}".format(est_X, est_Y))
+
+
+        e = (np.array(self.setpoint)[:2] - np.array([x,y])).T
+        rospy.loginfo("e: {}".format(e))
+
+        Ls = self.calc_Ls(x, y, self.Z)
+        rospy.loginfo("Ls: {}".format(Ls))
+        try:
+            Ls_inv = np.linalg.pinv(Ls)
+        except Exception as ex:
+            rospy.logerr(ex)
+            return [0, 0, 0, 0]
+        rospy.loginfo("Ls_inv: {}".format(Ls_inv))
+        self.vr = -self.lamb*Ls_inv @ e
+        self.vr = self.c_V_n[:2,:2]@self.vr[:2]
+        vr = self.saturate_output(vr)
+        rospy.loginfo("vr: {}".format(self.vr))
+        rospy.loginfo(self.vr)
         return self.vr

@@ -2,7 +2,7 @@
   <world name='default'>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
-      <pose>0 0 10 0 -0 0</pose>
+      <pose>0 100 10 0 -0 0</pose>
       <diffuse>0.8 0.8 0.8 1</diffuse>
       <specular>0.2 0.2 0.2 1</specular>
       <attenuation>
@@ -47,7 +47,7 @@
           <max_contacts>10</max_contacts>
         </collision>
         <visual name='visual'>
-          <cast_shadows>0</cast_shadows>
+          <cast_shadows>1</cast_shadows>
           <geometry>
             <plane>
               <normal>0 0 1</normal>
@@ -181,7 +181,7 @@
           </surface>
         </collision>
         <visual name='visual'>
-          <cast_shadows>0</cast_shadows>
+          <cast_shadows>1</cast_shadows>
           <geometry>
             <box>
               <size>20 20 0.1</size>
@@ -305,7 +305,7 @@
         </link>
       </model>
       <light name='sun'>
-        <pose>0 0 10 0 -0 0</pose>
+        <pose>0 100 10 0 -0 0</pose>
       </light>
     </state>
     <gui fullscreen='0'>
@@ -315,5 +315,22 @@
         <projection_type>perspective</projection_type>
       </camera>
     </gui>
+    <plugin name='wind_plugin' filename='libgazebo_wind_plugin.so'>
+      <frameId>base_link</frameId>
+      <robotNamespace/>
+      <windVelocityMean>0.0</windVelocityMean>
+      <windVelocityMax>10.0</windVelocityMax>
+      <windVelocityVariance>0</windVelocityVariance>
+      <windDirectionMean>0 1 0</windDirectionMean>
+      <windDirectionVariance>0</windDirectionVariance>
+      <windGustStart>0</windGustStart>
+      <windGustDuration>0</windGustDuration>
+      <windGustVelocityMean>0</windGustVelocityMean>
+      <windGustVelocityMax>20.0</windGustVelocityMax>
+      <windGustVelocityVariance>0</windGustVelocityVariance>
+      <windGustDirectionMean>1 0 0</windGustDirectionMean>
+      <windGustDirectionVariance>0</windGustDirectionVariance>
+      <windPubTopic>world_wind</windPubTopic>
+    </plugin>
   </world>
 </sdf>
