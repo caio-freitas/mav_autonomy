@@ -25,18 +25,22 @@ class GoToPose(smach.State):
                             input_keys=['pose_in'])
         self.mav = mav
         self.point_sub = rospy.Subscriber("apritag_detector/detection", Quaternion, self.point_cb)
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+
         self.detections = 0
         self.TIMEOUT = 10 #s
         self.HEIGHT = 5
 
 
     def execute(self, userdata):
+        self.state_pub.publish("GoToPose")
+        rospy.loginfo('Executing state GO_TO_POSE')
         rospy.loginfo("Going to position {}".format(userdata.pose_in))
         self.mav.takeoff(self.HEIGHT)
 
         self.mav.go_to(userdata.pose_in[0] ,userdata.pose_in[1] , self.HEIGHT, 1.2)
         init_time = rospy.get_time()
-        while rospy.get_time() - init_time < self.TIMEOUT: # 10s timeout   
+        while rospy.get_time() - init_time < self.TIMEOUT: # 10s timeout 
             self.mav.set_position(userdata.pose_in[0] ,userdata.pose_in[1] , self.HEIGHT)
             if self.detections >= 3:
                 return "detected"
@@ -54,6 +58,8 @@ class GoToPose(smach.State):
 class Search(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'fail'])
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+        
         self.mav = mav
         self.MAX_HEIGHT = 10
         self.detections = 0
@@ -61,6 +67,7 @@ class Search(smach.State):
         
 
     def execute(self, userdata):
+        self.state_pub.publish("Search")
         rospy.loginfo('Executing state SEARCH')
         while self.mav.drone_pose.pose.position.z < self.MAX_HEIGHT:
             if self.detections >= 3:
@@ -80,23 +87,28 @@ class Search(smach.State):
 class GoToLastDetection(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'fail'])
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+        
         self.mav = mav
 
-    def execute(self):
+    def execute(self, userdata):
+        self.state_pub.publish("GoToLastDetection")
         rospy.loginfo('Executing state GO_TO_LAST_DETECTION')
-        self.mav.go_to(last_position)
+        self.mav.go_to(last_position.pose.position.x, last_position.pose.position.y, last_position.pose.position.z)
         return "success"
 
     
 class Center(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'fail'])
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+
         self.mav = mav
         self.controller_type = rospy.get_param("controller_type")
-        setpoint_x = rospy.get_param("setpoint_features_x")
-        setpoint_y = rospy.get_param("setpoint_features_y")
-        setpoint_z = rospy.get_param("setpoint_features_z")
-        setpoint_yaw = rospy.get_param("setpoint_features_yaw")
+        self.setpoint_x = rospy.get_param("setpoint_features_x")
+        self.setpoint_y = rospy.get_param("setpoint_features_y")
+        self.setpoint_z = rospy.get_param("setpoint_features_z")
+        self.setpoint_yaw = rospy.get_param("setpoint_features_yaw")
 
         self.point_sub = rospy.Subscriber("/apritag_detector/detection", Quaternion, self.point_cb)
         self.obj_pose = PoseStamped()
@@ -107,18 +119,21 @@ class Center(smach.State):
         elif self.controller_type == "IBVS":
             self.controller = IBVS()
         
-        self.controller.set_target([setpoint_x,
-                                    setpoint_y,
-                                    setpoint_z,
-                                    setpoint_yaw])
+        self.controller.set_target([self.setpoint_x,
+                                    self.setpoint_y,
+                                    self.setpoint_z,
+                                    self.setpoint_yaw])
         self.detection = Quaternion()
+        self.last_detection_time = rospy.get_time()
 
     def point_cb(self, data):
         global last_position
         last_position = self.mav.drone_pose
         self.detection = data
+        self.last_detection_time = rospy.get_time()
 
     def execute(self, userdata):
+        self.state_pub.publish("Center")
         rospy.loginfo('Executing state CENTER')
 
         init_time = rospy.get_time()
@@ -132,20 +147,27 @@ class Center(smach.State):
 
             self.controller.update_measurements(self.detection, self.mav.drone_pose.pose.position.z)
             input = self.controller.calc_input()
-            self.mav.set_vel(input[0], input[1], 0)
+            self.mav.set_vel(input[0], input[1], 0, yaw=input[3])
             if rospy.is_shutdown():
                 break
-            e = math.sqrt((self.detection.x - 400)**2 + (self.detection.y - 480)**2)
+            e = math.sqrt((self.detection.x - 400)**2 + (self.detection.y - 400)**2) + 180*self.detection.w/math.pi
+
             if e < 20:
                 return "success"
+            
+            if rospy.get_time() - self.last_detection_time >= 1:
+                return 'fail'
         return "fail"
     
 class RTL(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success'])
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+        
         self.mav = mav
 
     def execute(self, userdata):
+        self.state_pub.publish("RTL")
         rospy.loginfo('Executing state RTL')
         self.mav.RTL()
         return "success"
@@ -155,6 +177,8 @@ class RTL(smach.State):
 class Approach(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'object_losted'])
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+        
         self.controller_type = rospy.get_param("controller_type")
         self.setpoint_x = rospy.get_param("setpoint_features_x")
         self.setpoint_y = rospy.get_param("setpoint_features_y")
@@ -178,12 +202,13 @@ class Approach(smach.State):
         self.detection = Quaternion()
 
     def execute(self, userdata):
+        self.state_pub.publish("Approach")
         rospy.loginfo('Executing state APPROACH')
         area_ratio = 0.05
         if self.detection.z != 0:
             area_ratio = self.detection.z
             rospy.loginfo("Setting initial area_ratio: {}".format(area_ratio))
-        while self.detection.z < 0.3: # approaching
+        while self.detection.z < 0.2: # approaching
             area_ratio = min(area_ratio + 0.0004, 1)
             self.controller.set_target([self.setpoint_x, self.setpoint_y, area_ratio, self.setpoint_yaw])
             self.controller.update_measurements(self.detection, self.mav.drone_pose.pose.position.z)
@@ -193,21 +218,32 @@ class Approach(smach.State):
             self.mav.rate.sleep()
             if rospy.is_shutdown():
                 break
+            if rospy.get_time() - self.last_detection_time >= 1:
+                return 'object_losted'
+            
+        while rospy.get_time() - self.last_detection_time <= 0.5:
+            input = self.controller.calc_input()
+            self.mav.set_vel(0, 0, input[2])
         # self.mav._disarm()
         return 'success'
         # TODO if no tag is detected, go to other state
     
     def point_cb(self, data):
+        global last_position
+        last_position = self.mav.drone_pose
         self.detection = data
         self.last_detection_time = rospy.get_time()
-
+        
 # define state Land
 class Land(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success'])
+        self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
+        
         self.mav = mav
     
     def execute(self, userdata):
+        self.state_pub.publish("Land")
         rospy.loginfo('Executing state LAND')
         self.mav.land()
         return 'success'
@@ -235,7 +271,7 @@ def main():
                                 remapping={'pose_in': 'obj_pose'})
 
         smach.StateMachine.add('GO_TO_LAST_DETECTION', GoToLastDetection(mav), 
-                                transitions={'success':'CENTER', 'fail':'RTL'})
+                                transitions={'success':'CENTER','fail':'RTL'})
 
         smach.StateMachine.add('SEARCH', Search(mav), 
                                 transitions={'success':'CENTER', 'fail':'RTL'})
