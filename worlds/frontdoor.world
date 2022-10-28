@@ -265,10 +265,10 @@
         </link>
       </model>
       <model name='Marker1_0'>
-        <pose>6.70693 5.32469 0.366788 3.14159 -1.56663 3.14159</pose>
+        <pose>6.65 5.25 0.35 0 -1.56663 -0.2</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>6.70693 5.32469 0.366788 3.14159 -1.56663 3.14159</pose>
+          <pose>6.65 5.25 0.35 0 -1.56663 -0.2</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 0 0 -0 0</acceleration>
           <wrench>0 0 0 0 -0 0</wrench>
@@ -295,10 +295,10 @@
         </link>
       </model>
       <model name='unit_box'>
-        <pose>6.5596 5.32729 0.206447 -0 -0 -0</pose>
+        <pose>6.5 5.3 0.206447 -0 -0 -0.2</pose>
         <scale>0.290602 0.300266 0.292895</scale>
         <link name='link'>
-          <pose>6.5596 5.32729 0.206447 -0 -0 -0</pose>
+          <pose>6.5 5.3 0.206447 -0 -0 -0.2</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>-0 0 0 -0 -0 -0</acceleration>
           <wrench>-0 0 0 0 -0 0</wrench>
