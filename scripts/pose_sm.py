@@ -26,7 +26,7 @@ class GoToPose(smach.State):
                             outcomes=['detected','detected_before', 'not_detected'],
                             input_keys=['pose_in'])
         self.mav = mav
-        self.point_sub = rospy.Subscriber("/visp_auto_tracker/code_message", String, self.point_cb)
+        self.point_sub = rospy.Subscriber("/apritag_detector/detection", Quaternion, self.point_cb)
         self.detections = 0
         self.TIMEOUT = 10 #s
         self.HEIGHT = 2
@@ -50,9 +50,8 @@ class GoToPose(smach.State):
 
     def point_cb(self, data):
         global last_position
-        if data.data != "":
-            self.detections += 1
-            last_position = self.mav.drone_pose
+        self.detections += 1
+        last_position = self.mav.drone_pose
 
 class Search(smach.State):
     def __init__(self, mav):
@@ -60,7 +59,7 @@ class Search(smach.State):
         self.mav = mav
         self.MAX_HEIGHT = 5
         self.detections = 0
-        self.point_sub = rospy.Subscriber("/visp_auto_tracker/code_message", String, self.point_cb)
+        self.point_sub = rospy.Subscriber("/apritag_detector/detection", Quaternion, self.point_cb)
         
 
     def execute(self, userdata):
@@ -77,9 +76,8 @@ class Search(smach.State):
 
     def point_cb(self, data):
         global last_position
-        if data.data != "":
-            self.detections += 1
-            last_position = self.mav.drone_pose
+        self.detections += 1
+        last_position = self.mav.drone_pose
 
 class GoToLastDetection(smach.State):
     def __init__(self, mav):
@@ -96,15 +94,16 @@ class Center(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'fail'])
         self.mav = mav
-        self.point_sub = rospy.Subscriber("/visp_auto_tracker/object_position_covariance", PoseWithCovarianceStamped, self.point_cb)
+        self.point_sub = rospy.Subscriber("/apritag_detector/detection", Quaternion, self.point_cb)
         self.obj_pose = PoseWithCovarianceStamped()
         
         self.code = ""
-        self.detection = PoseWithCovarianceStamped()
+        self.detection = Quaternion()
 
     def point_cb(self, data):
         global last_position
         last_position = self.mav.drone_pose
+        self.detection = data
 
     def execute(self, userdata):
         rospy.loginfo('Executing state CENTER')
@@ -115,38 +114,38 @@ class Center(smach.State):
         while not rospy.get_time() - init_time >= 30: # centering
             # print(self.detection)
             # print(self.mav.drone_pose.pose)
-            cov = max(self.detection.pose.covariance[0],
-                    self.detection.pose.covariance[6],
-                    self.detection.pose.covariance[13],
-                    self.detection.pose.covariance[20])
-            print("cov: {}".format(cov))
-            if (cov > 0.1):
-                self.mav.set_position(6,5,init_height)
+            # cov = max(self.detection.pose.covariance[0],
+            #           self.detection.pose.covariance[6],
+            #           self.detection.pose.covariance[13],
+            #           self.detection.pose.covariance[20])
+            # print("cov: {}".format(cov))
+            # if (cov > 0.1):
+            #     self.mav.set_position(6,5,init_height)
             
             o_r_b = np.array([[self.mav.drone_pose.pose.position.x],
                                 [self.mav.drone_pose.pose.position.y],
                                 [self.mav.drone_pose.pose.position.z]])
-            print("o_r_b: {}".format(o_r_b))
-            c_r_m = np.array([[self.detection.pose.pose.position.x],
-                                [self.detection.pose.pose.position.y],
-                                [self.detection.pose.pose.position.z]])
-            print("c_r_m: {}".format(c_r_m))
+            # print("o_r_b: {}".format(o_r_b))
+            c_r_m = np.array([[self.detection.x],
+                              [self.detection.y],
+                              [self.detection.z]])
+            # print("c_r_m: {}".format(c_r_m))
             o_R_b = quaternion_matrix([self.mav.drone_pose.pose.orientation.x,
                                         self.mav.drone_pose.pose.orientation.y,
                                         self.mav.drone_pose.pose.orientation.z,
                                         self.mav.drone_pose.pose.orientation.w])[:3,:3]
-            print("o_R_b: {}".format(o_R_b))
+            # print("o_R_b: {}".format(o_R_b))
             b_R_c = np.array([[0, -1, 0],
                             [-1, 0, 0],
                             [ 0, 0, -1]])
-            print("b_R_c: {}".format(b_R_c))
+            # print("b_R_c: {}".format(b_R_c))
             o_r_m = o_r_b + np.matmul(o_R_b, np.matmul(b_R_c, c_r_m))
             print("o_r_m: {}".format(o_r_m))
             goal_pose = o_r_m + np.array([[0],
                                         [0],
                                         [2]])
-            goal_pose[2] = init_height # overwrite with current height
-            print("goal_pose: {}".format(goal_pose))
+            # goal_pose[2] = init_height # overwrite with current height
+            # print("goal_pose: {}".format(goal_pose))
             # rel_position = PoseStamped()
             # rel_position.pose.position.x = goal_pose[0]
             # rel_position.pose.position.y = goal_pose[1]
@@ -156,9 +155,10 @@ class Center(smach.State):
             # self.mav.set_position(6,5,3)
             if rospy.is_shutdown():
                 break
-            # e = 
-            # if e < THRESHOLD:
-            #     return "success"
+            e = (c_r_m[0] - 0)**2 + (c_r_m[1] - 0) **2 + (c_r_m[2] - 2)**2
+            if e < 0.1:
+                rospy.logwarn("e: {}".format(e))
+                return "success"
         return "fail"
     
     def point_cb(self, data):
@@ -181,7 +181,7 @@ class Approach(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'object_losted'])
         self.mav = mav
-        self.point_sub = rospy.Subscriber("/visp_auto_tracker/object_position", PoseStamped, self.point_cb)
+        self.point_sub = rospy.Subscriber("apritag_detector/detection", PoseStamped, self.point_cb)
 
         self.obj_pose = PoseStamped()
         
@@ -189,27 +189,50 @@ class Approach(smach.State):
         self.controller = ImageBasedController()
         # self.controller = IBVS()
         self.last_detection_time = rospy.get_time()
-        self.detection = PoseStamped()
+        self.detection = Quaternion()
 
     def execute(self, userdata):
         rospy.loginfo('Executing state APPROACH')
-        area_ratio = 0.05
-        if self.detection.z != 0:
-            area_ratio = self.detection.z
-            rospy.loginfo("Setting initial area_ratio: {}".format(area_ratio))
-        while self.detection.z < 0.3: 
-            self.controller.update_measurements(self.detection, self.mav.drone_pose.pose.position.z)
-            input = self.controller.calc_input()
-            self.mav.set_vel(input[0], input[1], input[2], yaw = input[3])
+        init_height = self.mav.drone_pose.pose.position.z
+        init_time = rospy.get_time()
+        while not rospy.get_time() - init_time >= 10:
+            o_r_b = np.array([[self.mav.drone_pose.pose.position.x],
+                                [self.mav.drone_pose.pose.position.y],
+                                [self.mav.drone_pose.pose.position.z]])
+            print("o_r_b: {}".format(o_r_b))
+            c_r_m = np.array([[self.detection.x],
+                              [self.detection.y],
+                              [self.detection.z]])
+            print("c_r_m: {}".format(c_r_m))
+            o_R_b = quaternion_matrix([self.mav.drone_pose.pose.orientation.x,
+                                        self.mav.drone_pose.pose.orientation.y,
+                                        self.mav.drone_pose.pose.orientation.z,
+                                        self.mav.drone_pose.pose.orientation.w])[:3,:3]
+            print("o_R_b: {}".format(o_R_b))
+            b_R_c = np.array([[0, -1, 0],
+                            [-1, 0, 0],
+                            [ 0, 0, -1]])
+            print("b_R_c: {}".format(b_R_c))
+            o_r_m = o_r_b + np.matmul(o_R_b, np.matmul(b_R_c, c_r_m))
+            print("o_r_m: {}".format(o_r_m))
+            goal_pose = o_r_m + np.array([[0],
+                                        [0],
+                                        [2 - (rospy.get_time() - init_time)/10]])
+            print("goal_pose: {}".format(goal_pose))
 
+            yaw_d = self.detection.w 
+            if self.detection.w > np.pi:
+                yaw_d = self.detection.w - 2*np.pi
 
-            self.mav.rate.sleep()
+            self.mav.set_position_target(0b0001101111111000,
+                                        goal_pose[0],
+                                        goal_pose[1],
+                                        goal_pose[2],
+                                        yaw=0)
+            # self.mav.set_position(*goal_pose)
+            # self.mav.set_position(6,5,3)
             if rospy.is_shutdown():
                 break
-
-        self.mav.set_vel(0, 0, -0.5)
-        # self.mav._disarm()
-        return 'success'
         # TODO if no tag is detected, go to other state
     
     def point_cb(self, data):

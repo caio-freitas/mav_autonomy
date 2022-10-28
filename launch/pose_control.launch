@@ -9,8 +9,10 @@
         <arg name="sdf" value="$(find mavlink_sitl_gazebo)/models/iris_fpv_cam/iris_fpv_cam.sdf"/>
     </include>
 
+
+
 <!-- The following lines run the tracklive simulation sith visp_auto_tracker -->
-  <node pkg="visp_auto_tracker" type="visp_auto_tracker" name="visp_auto_tracker" output="screen">
+  <!-- <node pkg="visp_auto_tracker" type="visp_auto_tracker" name="visp_auto_tracker" output="screen">
     <param name="model_path" type="string" value="$(find mav_autonomy)/models" />
     <param name="model_name" type="string" value="pattern" />
     <param name="detector_type" type="string" value="zbar" />
@@ -19,9 +21,10 @@
     <remap from="/visp_auto_tracker/camera_info" to="/iris/usb_cam/camera_info"/>
     <remap from="/visp_auto_tracker/image_raw" to="/iris/usb_cam/image_raw"/>
     <param name="camera_info_url" value="package://mav_autonomy/models/calibration.ini" type="string" />
-  </node>
+  </node> -->
 
-    <node pkg="mav_autonomy" type="transform_broadcaster.py" name="transform_broadcaster" required="true" output="screen"/>
+    <!-- <node pkg="mav_autonomy" type="transform_broadcaster.py" name="transform_broadcaster" required="true" output="screen"/> -->
+    <node pkg="mav_autonomy" type="python_detect.py" name="detector" output="screen"/>
     
-    <!-- <node pkg="mav_autonomy" type="pose_sm.py" name="pose_sm" output="screen"/> -->
+    <node pkg="mav_autonomy" type="pose_sm.py" name="pose_sm" output="screen"/>
 </launch>

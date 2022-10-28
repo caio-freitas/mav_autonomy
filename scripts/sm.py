@@ -59,14 +59,15 @@ class Search(smach.State):
     def __init__(self, mav):
         smach.State.__init__(self, outcomes=['success', 'fail'])
         self.state_pub = rospy.Publisher("/state_transitions", String, queue_size=10)
-        
+        self.detections = 0
         self.mav = mav
         self.MAX_HEIGHT = 10
-        self.detections = 0
+        
         self.point_sub = rospy.Subscriber("apritag_detector/detection", Quaternion, self.point_cb)
         
 
     def execute(self, userdata):
+        self.detections = 0
         self.state_pub.publish("Search")
         rospy.loginfo('Executing state SEARCH')
         while self.mav.drone_pose.pose.position.z < self.MAX_HEIGHT:
@@ -142,17 +143,20 @@ class Center(smach.State):
             area_ratio = self.detection.z
             rospy.loginfo("Setting initial area_ratio: {}".format(area_ratio))
         
-
+        self.controller.set_target([self.setpoint_x,
+                                    self.setpoint_y,
+                                    area_ratio,
+                                    self.setpoint_yaw])
         while not rospy.get_time() - init_time >= 30: # centering
-
+            
             self.controller.update_measurements(self.detection, self.mav.drone_pose.pose.position.z)
             input = self.controller.calc_input()
-            self.mav.set_vel(input[0], input[1], 0, yaw=input[3])
+            self.mav.set_vel(input[0], input[1], input[2], yaw=input[3])
             if rospy.is_shutdown():
                 break
             e = math.sqrt((self.detection.x - 400)**2 + (self.detection.y - 400)**2) + 180*self.detection.w/math.pi
 
-            if e < 20:
+            if e <= 30:
                 return "success"
             
             if rospy.get_time() - self.last_detection_time >= 1:
@@ -209,7 +213,7 @@ class Approach(smach.State):
             area_ratio = self.detection.z
             rospy.loginfo("Setting initial area_ratio: {}".format(area_ratio))
         while self.detection.z < 0.2: # approaching
-            area_ratio = min(area_ratio + 0.0004, 1)
+            area_ratio = min(area_ratio + 0.0002, 1)
             self.controller.set_target([self.setpoint_x, self.setpoint_y, area_ratio, self.setpoint_yaw])
             self.controller.update_measurements(self.detection, self.mav.drone_pose.pose.position.z)
             input = self.controller.calc_input()
@@ -258,7 +262,7 @@ def main():
     # Create a SMACH state machine
     sm = smach.StateMachine(outcomes=['done', 'aborted'],
                             input_keys=['obj_pose'])
-    sm.userdata.obj_pose = [6, 5]
+    sm.userdata.obj_pose = [5.8, 4.8]
 
     # Open the container
     with sm:

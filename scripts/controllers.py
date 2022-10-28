@@ -84,10 +84,7 @@ class ImageBasedController(Controller):
 
     def calc_input(self):
         e = (np.array(self.setpoint) - np.array(self.m)).T
-        # Lx = np.array([[0.003/self.Z, 0, 0, 0],
-        #                 [0, 0.003/self.Z, 0, 0],
-        #                 [0, 0, 0.4, 0],
-        #                 [0, 0, 0, 0.05]])
+
         Lx_i = np.array([[self.Z/self.f, 0, 0, 0],
                         [0, self.Z/self.f, 0, 0],
                         [0, 0, 1, 0],
@@ -96,6 +93,7 @@ class ImageBasedController(Controller):
         ur = np.matmul(Lx_i, e)
         
         vr = -self.lamb*np.matmul(self.b_V_c,ur)
+        rospy.loginfo("vr: {}".format(vr))
         vr = self.saturate_output(vr)
 
         return vr
@@ -129,12 +127,16 @@ class IBVS(Controller):
         self.f = 692.978391 #3.67e-3
         x = y = 0
         # self.lamb = 10
-        self.lamb = 0.15
+        self.lamb = 2
 
         Ls = self.calc_Ls(x, y, self.Z)
         
-        self.c_V_n = np.array([[1, 0, 0, 0],
-                            [0, -1, 0, 0],
+        # self.c_V_n = np.array([[1, 0, 0, 0],
+        #                     [0, -1, 0, 0],
+        #                     [0, 0, -1, 0],
+        #                     [0, 0, 0, -1]])
+        self.c_V_n = np.array([[0, 1, 0, 0],
+                            [1, 0, 0, 0],
                             [0, 0, -1, 0],
                             [0, 0, 0, -1]])
         
@@ -144,7 +146,8 @@ class IBVS(Controller):
         self.vr = np.zeros(4)
 
     def calc_Ls(self, x, y, Z):
-        A0l = 0.2/3
+        A0l = 2*0.24
+        # Z = max(0.5, Z) # saturate Z influence on interaction matrix
         # return np.array([[-1/Z,        0, x/Z, x*y   , -(1+x**2),  y],
         #                 [0,         -1/Z, y/Z,  1+y**2, -x*y,     -x]])
         return np.array([[-1/Z,        0, x/Z, x*y   , -(1+x**2),  y],
@@ -157,12 +160,9 @@ class IBVS(Controller):
         y = (self.m[1] - 400)/self.f
         est_X = x*self.Z
         est_Y = y*self.Z
-        rospy.loginfo("estimated relative position: {}, {}".format(est_X, est_Y))
-
 
         # e = (np.array(self.setpoint)[:2] - np.array([x,y])).T
         e = (np.array(self.setpoint) - np.array([x,y, self.m[2], self.m[3]])).T
-        rospy.loginfo("e: {}".format(e))
 
         Ls = self.calc_Ls(x, y, self.Z)
         # rospy.loginfo("Ls: {}".format(Ls))
@@ -172,6 +172,7 @@ class IBVS(Controller):
             rospy.logerr(ex)
             return [0, 0, 0, 0]
         # rospy.loginfo("Ls_inv: {}".format(Ls_inv))
+        # self.lamb = np.array([[2],[2],[1],[1], [1],[1]])
         self.vr = -self.lamb*Ls_inv @ e
         # self.vr = self.c_V_n[:2,:2]@self.vr[:2]
         self.vr = np.array([self.vr[i] for i in [0, 1, 2, 5]]) #exclude non-used angular velocities

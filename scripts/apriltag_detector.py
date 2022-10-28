@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from visions import Image
 import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Quaternion
