@@ -10,7 +10,7 @@ class Controller():
         self.setpoint = setpoint
         self.Z = 0
         self.vb = 0
-        self.input_limits = [1.2, 1.2, 0.2, 0.2]
+        self.input_limits = [1, 1, 0.4, 0.2]
 
     def set_target(self, setpoint):
         self.setpoint = setpoint
@@ -64,7 +64,7 @@ class ImageBasedController(Controller):
         vc = - lambda * Lx+ * e
         """
         self.f = 692.978391 
-        self.lamb = 0.7
+        self.lamb = 0.8
         self.setpoint = init_setpoint
         self.b_V_c = np.array([[0, -1, 0, 0],
                         [-1, 0, 0, 0],
@@ -83,17 +83,18 @@ class ImageBasedController(Controller):
         self.Z = Z
 
     def calc_input(self):
+        A0l = 6*0.24
         e = (np.array(self.setpoint) - np.array(self.m)).T
-
+        # rospy.loginfo("e: {}".format(e))
         Lx_i = np.array([[self.Z/self.f, 0, 0, 0],
                         [0, self.Z/self.f, 0, 0],
-                        [0, 0, 1, 0],
-                        [0, 0, 0, 0.1]])
+                        [0, 0, (self.Z**3)/A0l, 0],
+                        [0, 0, 0, 1]])
         
         ur = np.matmul(Lx_i, e)
         
         vr = -self.lamb*np.matmul(self.b_V_c,ur)
-        rospy.loginfo("vr: {}".format(vr))
+        # rospy.loginfo("vr: {}".format(vr))
         vr = self.saturate_output(vr)
 
         return vr
@@ -127,7 +128,7 @@ class IBVS(Controller):
         self.f = 692.978391 #3.67e-3
         x = y = 0
         # self.lamb = 10
-        self.lamb = 2
+        self.lamb = 0.9
 
         Ls = self.calc_Ls(x, y, self.Z)
         
@@ -137,7 +138,7 @@ class IBVS(Controller):
         #                     [0, 0, 0, -1]])
         self.c_V_n = np.array([[0, 1, 0, 0],
                             [1, 0, 0, 0],
-                            [0, 0, -1, 0],
+                            [0, 0, 1, 0],
                             [0, 0, 0, -1]])
         
         # J = np.zeros(4, 4)
@@ -146,18 +147,20 @@ class IBVS(Controller):
         self.vr = np.zeros(4)
 
     def calc_Ls(self, x, y, Z):
-        A0l = 2*0.24
+        A0l = 3*0.24
         # Z = max(0.5, Z) # saturate Z influence on interaction matrix
         # return np.array([[-1/Z,        0, x/Z, x*y   , -(1+x**2),  y],
-        #                 [0,         -1/Z, y/Z,  1+y**2, -x*y,     -x]])
-        return np.array([[-1/Z,        0, x/Z, x*y   , -(1+x**2),  y],
-                        [0,         -1/Z, y/Z,  1+y**2, -x*y,     -x],
-                        [0, 0, -A0l/(Z**3), -x*A0l/(Z**3), -y*A0l/(Z**3), 0],
-                        [0, 0,  0,  0,  0,  1]])
+        #                 [0,         -1/Z, y/Z,  1+y**2, -x*y,     -x],
+        #                 [0, 0, 2*A0l/(Z**3), -y*2*A0l/(Z**3), x*2*A0l/(Z**3), 0],
+        #                 [0, 0, 0, 0, 0, 1]])
+        return np.array([[-1/Z,        0, x/Z,  y],
+                        [0,         -1/Z, y/Z,     -x],
+                        [0, 0, A0l/(Z**3), 0],
+                        [0, 0,  0,          1]])
     
     def calc_input(self):
         x = (self.m[0] - 400)/self.f
-        y = (self.m[1] - 400)/self.f
+        y = (self.m[1] - 480)/self.f
         est_X = x*self.Z
         est_Y = y*self.Z
 
@@ -165,20 +168,19 @@ class IBVS(Controller):
         e = (np.array(self.setpoint) - np.array([x,y, self.m[2], self.m[3]])).T
 
         Ls = self.calc_Ls(x, y, self.Z)
-        # rospy.loginfo("Ls: {}".format(Ls))
+        # rospy.logwarn("Ls: {}".format(Ls))
         try:
             Ls_inv = np.linalg.pinv(Ls)
         except Exception as ex:
             rospy.logerr(ex)
             return [0, 0, 0, 0]
         # rospy.loginfo("Ls_inv: {}".format(Ls_inv))
-        # self.lamb = np.array([[2],[2],[1],[1], [1],[1]])
+
         self.vr = -self.lamb*Ls_inv @ e
-        # self.vr = self.c_V_n[:2,:2]@self.vr[:2]
-        self.vr = np.array([self.vr[i] for i in [0, 1, 2, 5]]) #exclude non-used angular velocities
-        self.vr = self.c_V_n@self.vr
-        rospy.loginfo("vr: {}".format(self.vr))
+        
+        self.vr[:4] = self.c_V_n@self.vr[:4]
+        # rospy.loginfo("vr: {}".format(self.vr))
         self.vr = self.saturate_output(self.vr)
         
-        rospy.loginfo(self.vr)
+        # rospy.loginfo(self.vr)
         return self.vr

@@ -7,7 +7,7 @@
         <arg name="paused" default="false"/>
         <arg name="x" default="6.5596"/>
         <arg name="y" default="5.32729"/>
-        <arg name="z" default="0.48"/>
+        <arg name="z" default="0.50"/>
         <!-- <arg name="vehicle" default="iris_fpv_cam"/> -->
         <arg name="sdf" value="$(find mavlink_sitl_gazebo)/models/iris_fpv_cam_box/iris_fpv_cam_box.sdf"/>
     </include>
@@ -28,5 +28,5 @@
     -->
     <node pkg="mav_autonomy" type="sm2.py" name="sm2" output="screen" />
 	<!-- <node pkg="mav_autonomy" type="apriltag_detector.py" name="apriltag_detector" /> -->
-    <node pkg="image_view" type="image_view" name="apriltag_detector_debug" args="image:=/apritag_detector/debug/image_raw" />
+    <!-- <node pkg="image_view" type="image_view" name="apriltag_detector_debug" args="image:=/apritag_detector/debug/image_raw" /> -->
 </launch>

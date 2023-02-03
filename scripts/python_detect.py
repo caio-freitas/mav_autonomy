@@ -124,38 +124,19 @@ def img_cb(msg):
             #solvePNP returns rotation and translation vectors
             retval, rvec, tvec  = cv2.solvePnP(objectPoints, imagePoints, camInfo, distCoeff, useExtrinsicGuess=False, flags=SOLVEPNP_IPPE_SQUARE)
             ##print(cv2.solvePnP(objectPoints, imagePoints, camInfo, distCoeff, useExtrinsicGuess=False, flags=SOLVEPNP_IPPE_SQUARE))
-            #print("rvec:", rvec)
-            #print("tvec:", tvec)
             R = cv2.Rodrigues(tvec)[0]
-            
-            # #print("R:", R)
+            (ptA, ptB, ptC, ptD) = detect.corners
+            ptB = np.array([int(ptB[0]), int(ptB[1])])
+            ptC = np.array([int(ptC[0]), int(ptC[1])])
+            ptD = np.array([int(ptD[0]), int(ptD[1])])
+            ptA = np.array([int(ptA[0]), int(ptA[1])])
+            # sort points to determine angle
+            pts = np.array([ptA, ptB, ptC, ptD])
+            phi = np.arctan2(*(pts[3][::-1] - pts[2][::-1]))
 
-            #Convert to yaw, pitch, roll
-            # yaw = np.arctan2(R[0,2],R[2,2])*180/np.pi # 180//np.pi gets to integers?
-            # pitch = np.arcsin(-R[1][2])*180/np.pi
-            # roll = (np.arctan2(R[1,0],R[1,1])*180/np.pi) + 180
-            roll = np.arctan2(R[1,0],R[1,1])
-            q = Quaternion(tvec[0][0], tvec[1][0], tvec[2][0], roll)
+            q = Quaternion(tvec[0][0], tvec[1][0], tvec[2][0], phi)
             #print(q)
             point_pub.publish(q)
-
-            #This stuff only outputs in euler angles and should probably be removed but am keeping for debugging purposes
-            # rvec_matrix = cv2.Rodrigues(rvec)[0] #Debug
-            # proj_matrix = np.hstack((rvec_matrix, tvec)) #Debug
-            # eulerAngles = -cv2.decomposeProjectionMatrix(proj_matrix)[6] #Debug
-            # yaw   = eulerAngles[1] #Debug
-            # pitch = eulerAngles[0] #Debug
-            # roll  = eulerAngles[2] #Debug
-
-            #Output yaw, pitch, roll values to command line
-            #print("\nYaw", yaw)
-            #print("pitch", pitch)
-            #print("roll", roll)
-
-            #Output yaw, pitch, roll values to NetworkTables
-            # NT.putString("yaw", yaw)
-            # NT.putString("pitch", pitch)
-            # NT.putString("roll", roll)
 
     #Output window with the live feed from the camera and overlays
     cv2.imshow('Vid-Stream', image) #Comment out when running in headless mode to not piss off python

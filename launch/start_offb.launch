@@ -12,7 +12,7 @@
     <rosparam command="load" file="$(find mav_autonomy)/config/image_uncoupled_params.yaml"/>
     <!-- <rosparam command="load" file="$(find mav_autonomy)/config/IBVS_params.yaml"/> -->
 
-    <node pkg="mav_autonomy" type="sm.py" name="sm" output="screen" />
+    <node pkg="mav_autonomy" type="sm.py" name="sm" output="screen" required="false" /> <!-- set to true for multiple simulations -->
 	<node pkg="mav_autonomy" type="apriltag_detector.py" name="apriltag_detector" />
     <node pkg="image_view" type="image_view" name="apriltag_detector_debug" args="image:=/apritag_detector/debug/image_raw" />
     

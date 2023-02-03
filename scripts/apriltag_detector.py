@@ -33,18 +33,17 @@ def img_cb(msg):
         ptA = np.array([int(ptA[0]), int(ptA[1])])
 
         # draw the bounding box of the AprilTag detection
-        cv2.line(gray, ptA, ptB, (255, 255, 255), 4)
-        cv2.line(gray, ptB, ptC, (255, 255, 255), 4)
-        cv2.line(gray, ptC, ptD, (255, 255, 255), 4)
-        cv2.line(gray, ptD, ptA, (255, 255, 255), 4)
+        cv2.line(gray, ptA, ptB, (200, 200, 200), 4)
+        cv2.line(gray, ptB, ptC, (200, 200, 200), 4)
+        cv2.line(gray, ptC, ptD, (200, 200, 200), 4)
+        cv2.line(gray, ptD, ptA, (200, 200, 200), 4)
 
         v1 = ptA - ptB
         v2 = ptB - ptC
         
+        # TODO investigate why it's so diffeent from 
+        A = np.cross(v1, v2)/(IM_SIZE)
         
-        A = (v1[0]*v2[1] - v2[0]*v1[1])/IM_SIZE
-        
-
         # sort points to determine angle
         pts = np.array([ptA, ptB, ptC, ptD])
         # pts = pts[pts[:,1].argsort()] #sort by Y coordinate
@@ -54,7 +53,7 @@ def img_cb(msg):
 
         # draw the center (x, y)-coordinates of the AprilTag
         (cX, cY) = (int(r.center[0]), int(r.center[1]))
-        cv2.circle(gray, (cX, cY), 5, (255, 255, 255), -1)
+        cv2.circle(gray, (cX, cY), 5, (200, 200, 200), -1)
 
 
         # print("[INFO] center: {}, {}".format(cX, cY))

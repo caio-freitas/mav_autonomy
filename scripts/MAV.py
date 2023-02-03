@@ -34,7 +34,7 @@ mavros_set_global_pub = rospy.get_param("/mavros_set_global_pub")
 
 class MAV:
     def __init__(self, mav_name):
-        self.rate = rospy.Rate(100)
+        self.rate = rospy.Rate(50)
         self.desired_state = ""
         self.drone_pose = PoseStamped()
         self.goal_pose = PoseStamped()
@@ -269,6 +269,9 @@ class MAV:
         predefined average velocity avg_vel
         """
 
+        if DEBUG:
+            rospy.logwarn("Going to {}, {}, {}".format(x_goal, y_goal, z_goal))
+
         x_init = self.drone_pose.pose.position.x
         y_init = self.drone_pose.pose.position.y
         z_init = self.drone_pose.pose.position.z
@@ -282,6 +285,7 @@ class MAV:
                                 z_init + (t/T)*(z_goal - z_init))
             t = rospy.get_time() - init_t
             self.rate.sleep()
+        self.set_position(x_goal, y_goal, z_goal)
 
     def go_to_pf(self, x_goal, y_goal, z_goal, avg_vel=0.8):
         """
@@ -347,19 +351,24 @@ class MAV:
             self.local_position_pub.publish(self.drone_pose)
             self.rate.sleep()
 
-    def land(self):
-        velocity = 0.4
+    def land(self, velocity=0.4):
         init_time = rospy.get_rostime().secs
         height = self.drone_pose.pose.position.z
         self.set_position(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y,0)
         self.rate.sleep()
         rospy.logwarn('Landing')
-        while not self.LAND_STATE == ExtendedState.LANDED_STATE_ON_GROUND or rospy.get_rostime().secs - init_time < (height/velocity)*1.3:
+        init_pose = self.drone_pose.pose.position
+        # TODO use position to land instead of velocity
+        while self.LAND_STATE != ExtendedState.LANDED_STATE_ON_GROUND and rospy.get_rostime().secs - init_time < (height/velocity):
             #rospy.logwarn('Landing')
             if DEBUG:
                 rospy.loginfo('Height: ' + str(abs(self.drone_pose.pose.position.z)))
             ################# Velocity Control #################
-            self.set_vel(0, 0, -velocity, 0, 0, 0)
+            self.set_position_target(0b0001111111011100,
+                                        init_pose.x,
+                                        init_pose.y,
+                                        z_velocity=-velocity)
+            # self.set_vel(0, 0, -velocity, 0, 0, 0)
             self.rate.sleep()
         rospy.logwarn("LANDED_STATE: ON GROUND\nDISARMING")
         self.arm(False)
@@ -435,7 +444,7 @@ class MAV:
                 if DEBUG:
                     rospy.loginfo('Position: (' + str(self.drone_pose.pose.position.x) + ', ' + str(self.drone_pose.pose.position.y) + ', '+ str(self.drone_pose.pose.position.z) + ')')        
                     rospy.logwarn('Time: ' + str(sec))
-              
+            
         else:
             self.set_position(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, altitude)
 
