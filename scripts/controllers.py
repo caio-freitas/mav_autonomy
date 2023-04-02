@@ -1,8 +1,5 @@
 import rospy
 import numpy as np
-from simple_pid import PID
-
-# TODO do superclass 
 
 
 class Controller():
@@ -10,7 +7,10 @@ class Controller():
         self.setpoint = setpoint
         self.Z = 0
         self.vb = 0
-        self.input_limits = [1, 1, 0.4, 0.2]
+        self.input_limits = [rospy.get_param("/limit_v_x"),
+                             rospy.get_param("/limit_v_y"),
+                             rospy.get_param("/limit_v_z"),
+                             rospy.get_param("/limit_v_w")]
 
     def set_target(self, setpoint):
         self.setpoint = setpoint
@@ -63,8 +63,8 @@ class ImageBasedController(Controller):
 
         vc = - lambda * Lx+ * e
         """
-        self.f = 692.978391 
-        self.lamb = 0.8
+        self.f = rospy.get_param("/controller_f")
+        self.lamb = rospy.get_param("/controller_lambda")
         self.setpoint = init_setpoint
         self.b_V_c = np.array([[0, -1, 0, 0],
                         [-1, 0, 0, 0],
@@ -125,17 +125,13 @@ class IBVS(Controller):
         """
         self.setpoint = init_setpoint
         self.Z = 2
-        self.f = 692.978391 #3.67e-3
+        self.f = rospy.get_param("/controller_f")
         x = y = 0
-        # self.lamb = 10
-        self.lamb = 0.9
+        self.lamb = rospy.get_param("/controller_lambda")
 
         Ls = self.calc_Ls(x, y, self.Z)
         
-        # self.c_V_n = np.array([[1, 0, 0, 0],
-        #                     [0, -1, 0, 0],
-        #                     [0, 0, -1, 0],
-        #                     [0, 0, 0, -1]])
+        
         self.c_V_n = np.array([[0, 1, 0, 0],
                             [1, 0, 0, 0],
                             [0, 0, 1, 0],
@@ -148,7 +144,7 @@ class IBVS(Controller):
 
     def calc_Ls(self, x, y, Z):
         A0l = 3*0.24
-        # Z = max(0.5, Z) # saturate Z influence on interaction matrix
+        Z = max(0.4, Z) # saturate Z influence on interaction matrix
         # return np.array([[-1/Z,        0, x/Z, x*y   , -(1+x**2),  y],
         #                 [0,         -1/Z, y/Z,  1+y**2, -x*y,     -x],
         #                 [0, 0, 2*A0l/(Z**3), -y*2*A0l/(Z**3), x*2*A0l/(Z**3), 0],
@@ -168,19 +164,17 @@ class IBVS(Controller):
         e = (np.array(self.setpoint) - np.array([x,y, self.m[2], self.m[3]])).T
 
         Ls = self.calc_Ls(x, y, self.Z)
-        # rospy.logwarn("Ls: {}".format(Ls))
+        
         try:
             Ls_inv = np.linalg.pinv(Ls)
         except Exception as ex:
             rospy.logerr(ex)
             return [0, 0, 0, 0]
-        # rospy.loginfo("Ls_inv: {}".format(Ls_inv))
-
+        
         self.vr = -self.lamb*Ls_inv @ e
         
         self.vr[:4] = self.c_V_n@self.vr[:4]
-        # rospy.loginfo("vr: {}".format(self.vr))
+        
         self.vr = self.saturate_output(self.vr)
         
-        # rospy.loginfo(self.vr)
         return self.vr

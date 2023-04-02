@@ -3,3 +3,11 @@ setpoint_features_x: 400
 setpoint_features_y: 480
 setpoint_features_z: 0.02
 setpoint_features_yaw: 0
+
+controller_f: 692.978391
+controller_lambda: 0.8
+
+limit_v_x: 1
+limit_v_y: 1
+limit_v_z: 0.4
+limit_v_w: 0.2
