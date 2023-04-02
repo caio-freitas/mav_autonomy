@@ -9,9 +9,6 @@ import numpy as np
 
 bridge = CvBridge()
 
-# options = apriltag.DetectorOptions(families="tag36h11")
-# detector = apriltag.Detector(options)
-
 detector = apriltag.Detector()
 
 img_pub = rospy.Publisher("apritag_detector/debug/image_raw", Image, queue_size=1)
